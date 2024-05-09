@@ -24,7 +24,7 @@ pipeline = transformers.pipeline(
     model_kwargs={"torch_dtype": torch.bfloat16},
     device_map="cuda:4"
 )
-pic_dir = "../pic/"
+pic_dir = "../data/pic/"
 images = []
 # prepare image and text prompt, using the appropriate prompt template
 for i in range(1,3):
