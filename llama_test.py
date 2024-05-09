@@ -9,7 +9,7 @@ llama_version_8B = "meta-llama/Meta-Llama-3-8B-Instruct"
 llama_version_70B = "meta-llama/Meta-Llama-3-70B-Instruct"
 llama_version = llama_version_70B
 #设置huggingface秘钥
-hf_token = "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"
+hf_token = ""
 # 设置分词器和停止 ID
 tokenizer = AutoTokenizer.from_pretrained(
     llama_version,
