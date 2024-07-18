@@ -13,6 +13,7 @@ class EmoDataset(Dataset):
             if filename.endswith('.txt'):
                 with open(os.path.join(positive_dir, filename), 'r', encoding='utf-8') as file:
                     text = file.read()
+                    text = "Please determine the sentiment of this text, Keep the output as short as possible:" + text
                     self.data.append(text)
                     self.labels.append(1)  # Positive label
 
@@ -21,6 +22,7 @@ class EmoDataset(Dataset):
             if filename.endswith('.txt'):
                 with open(os.path.join(negative_dir, filename), 'r', encoding='utf-8') as file:
                     text = file.read()
+                    text = "Please determine the sentiment of this text, output <positive> or <negative>:" + text
                     self.data.append(text)
                     self.labels.append(0)  # Negative label
 

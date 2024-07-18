@@ -18,6 +18,7 @@ def preprocess_function(examples, tokenizer):
 def collate_fn(batch, tokenizer,max_length=512):
     texts = [item['text'] for item in batch]
     labels = [item['label'] for item in batch]
+    #print(texts[1])
     encodings = tokenizer(texts, padding=True, truncation=True, return_tensors="pt", max_length=max_length)
     encodings['labels'] = torch.tensor(labels)
     return encodings
@@ -35,19 +36,11 @@ if __name__ == '__main__':
     )
     tokenizer.pad_token = tokenizer.eos_token
     model = CustomModelForBinaryClassification(model_id)
-
-    prompt = "The movie was fantastic and I really enjoyed it because"
-    inputs = tokenizer(prompt, return_tensors='pt')
-    input_ids = inputs['input_ids']
-    attention_mask = inputs['attention_mask']
-
-    # 获取模型输出
-    outputs = model(input_ids=input_ids, attention_mask=attention_mask)
     # 交叉熵损失 b*t batchsize和第t类别
     criterion = nn.CrossEntropyLoss()
 
     EmoDataset = EmoDataset(positive_dir, negative_dir)
-    train_dataloader = DataLoader(EmoDataset, shuffle=True, batch_size=32,collate_fn=lambda batch: collate_fn(batch, tokenizer))
+    train_dataloader = DataLoader(EmoDataset, shuffle=True, batch_size=16,collate_fn=lambda batch: collate_fn(batch, tokenizer))
     optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
     num_training_steps = len(train_dataloader) * 3  # 3个epoch
     scheduler = get_scheduler(
@@ -61,6 +54,7 @@ if __name__ == '__main__':
             input_ids = batch['input_ids'].squeeze(1)
             attention_mask = batch['attention_mask'].squeeze(1)
             labels = batch['labels']
+            print(labels)
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
             loss = criterion(outputs, labels)
             loss.backward()
@@ -70,7 +64,11 @@ if __name__ == '__main__':
             step += 1
             # 打印每一步的损失
             print(f"Step {step + 1}/{len(train_dataloader)}, Loss: {loss.item():.4f}")
-        torch.save(model.state_dict(), f"../models/emo{epoch+1}.pt")
+            if step % 30 ==0 and step != 0:
+                torch.save({
+                    'linear': model.linear.state_dict(),
+                    'classifier': model.classifier.state_dict()
+                }, f"../pth/model_epoch_step{step}.pth")
     # x = torch.tensor(
     #     [[1,0.3]]
     # )
