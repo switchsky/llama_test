@@ -7,7 +7,7 @@ from tqdm import tqdm
 from EmoDataset import EmoDataset
 from transformers import AutoTokenizer, AutoModelForCausalLM, get_scheduler
 
-from text_generator.Projection import CustomModelForBinaryClassification
+from Projection import CustomModelForBinaryClassification
 
 os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
 import transformers
@@ -16,10 +16,10 @@ def preprocess_function(examples, tokenizer):
     return tokenizer(examples['text'], padding="max_length", truncation=True, return_tensors="pt")
 
 def collate_fn(batch, tokenizer,max_length=512):
-    texts = [item['text'] for item in batch]
+    texts = [item['text'] + tokenizer.eos_token for item in batch]
     labels = [item['label'] for item in batch]
     #print(texts[1])
-    encodings = tokenizer(texts, padding=True, truncation=True, return_tensors="pt", max_length=max_length)
+    encodings = tokenizer(texts,truncation=True, return_tensors="pt", max_length=max_length,padding='max_length')
     encodings['labels'] = torch.tensor(labels)
     return encodings
 
@@ -35,12 +35,13 @@ if __name__ == '__main__':
         add_bos_token=True,
     )
     tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "left"
     model = CustomModelForBinaryClassification(model_id)
     # 交叉熵损失 b*t batchsize和第t类别
     criterion = nn.CrossEntropyLoss()
 
     EmoDataset = EmoDataset(positive_dir, negative_dir)
-    train_dataloader = DataLoader(EmoDataset, shuffle=True, batch_size=16,collate_fn=lambda batch: collate_fn(batch, tokenizer))
+    train_dataloader = DataLoader(EmoDataset, shuffle=True, batch_size=16,collate_fn=lambda batch: collate_fn(batch, tokenizer),drop_last=True)
     optimizer = torch.optim.AdamW(model.parameters(), lr=5e-5)
     num_training_steps = len(train_dataloader) * 3  # 3个epoch
     scheduler = get_scheduler(
@@ -48,13 +49,13 @@ if __name__ == '__main__':
     )
     total_loss = 0
     step = 0
+    log = open('log.txt', mode='a', encoding='utf-8')
     for epoch in range(3):
         for batch in tqdm(train_dataloader):
             optimizer.zero_grad()
             input_ids = batch['input_ids'].squeeze(1)
             attention_mask = batch['attention_mask'].squeeze(1)
             labels = batch['labels']
-            print(labels)
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
             loss = criterion(outputs, labels)
             loss.backward()
@@ -64,13 +65,14 @@ if __name__ == '__main__':
             step += 1
             # 打印每一步的损失
             print(f"Step {step + 1}/{len(train_dataloader)}, Loss: {loss.item():.4f}")
-            if step % 30 ==0 and step != 0:
-                torch.save({
-                    'linear': model.linear.state_dict(),
-                    'classifier': model.classifier.state_dict()
-                }, f"../pth/model_epoch_step{step}.pth")
+            print(f"Step {step + 1}/{len(train_dataloader)}, Loss: {loss.item():.4f}",file=log)
+        torch.save({
+            'linear': model.linear.state_dict(),
+            'classifier': model.classifier.state_dict()
+        }, f"../pth/model_epoch{epoch+1}.pth")
     # x = torch.tensor(
     #     [[1,0.3]]
     # )
     # y = torch.tensor([1])
     # print(criterion(x,y))
+    log.close()
